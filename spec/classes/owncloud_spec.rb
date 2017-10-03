@@ -18,7 +18,7 @@ describe 'owncloud' do
           apache_group = 'www-data'
           datadirectory = '/var/www/owncloud/data'
           documentroot = '/var/www/owncloud'
-          package_name = 'owncloud-server'
+          package_name = 'owncloud-files'
 
           case facts[:operatingsystem]
           when 'Debian'
@@ -28,33 +28,19 @@ describe 'owncloud' do
               apache_version = '2.2'
             end
           when 'Ubuntu'
-            if (Versionomy.parse(facts[:operatingsystemrelease]) > Versionomy.parse('13.10')) || (Versionomy.parse(facts[:operatingsystemrelease]) == Versionomy.parse('13.10'))
-              apache_version = '2.4'
-            else
-              apache_version = '2.2'
-            end
+            apache_version = '2.4'
           end
         when 'RedHat'
           apache_user = 'apache'
           apache_group = 'apache'
           datadirectory = '/var/www/html/owncloud/data'
           documentroot = '/var/www/html/owncloud'
+          package_name = 'owncloud-files'
 
-          case facts[:operatingsystem]
-          when 'Fedora'
-            package_name = 'owncloud-server'
-            if (Versionomy.parse(facts[:operatingsystemrelease]) > Versionomy.parse('18')) || (Versionomy.parse(facts[:operatingsystemrelease]) == Versionomy.parse('18'))
-              apache_version = '2.4'
-            else
-              apache_version = '2.2'
-            end
+          if (Versionomy.parse(facts[:operatingsystemrelease]) > Versionomy.parse('7')) || (Versionomy.parse(facts[:operatingsystemrelease]) == Versionomy.parse('7'))
+            apache_version = '2.4'
           else
-            package_name = 'owncloud'
-            if (Versionomy.parse(facts[:operatingsystemrelease]) > Versionomy.parse('7')) || (Versionomy.parse(facts[:operatingsystemrelease]) == Versionomy.parse('7'))
-              apache_version = '2.4'
-            else
-              apache_version = '2.2'
-            end
+            apache_version = '2.2'
           end
         end
 
@@ -77,6 +63,7 @@ describe 'owncloud' do
             is_expected.to compile.with_all_deps
 
             is_expected.to contain_class('owncloud::params')
+            is_expected.to contain_class('owncloud::php').that_comes_before('owncloud::install')
             is_expected.to contain_class('owncloud::install').that_comes_before('owncloud::apache')
             is_expected.to contain_class('owncloud::apache').that_comes_before('owncloud::config')
             is_expected.to contain_class('owncloud::config').that_comes_before('owncloud')
@@ -85,41 +72,50 @@ describe 'owncloud' do
             is_expected.to contain_package("#{package_name}").with_ensure('present')
           end
 
+          # owncloud::php
+
+          it 'should install and configure php and php modules' do
+            is_expected.to contain_class('php')
+
+            if facts[:osfamily] == 'Debian'
+              %w(curl gd ldap mysqlnd).each do |mod|
+                is_expected.to contain_php__module(mod).that_requires('class[php]')
+              end
+            end
+
+            if facts[:osfamily] == 'RedHat'
+              %w(gd ldap mbstring mysql pdo process xml).each do |mod|
+                is_expected.to contain_php__module(mod).that_requires('class[php]')
+              end
+            end
+          end
+
           # owncloud::install
 
-          it 'should include classes to manage repo, install owncloud repo and install owncloud server package' do
+          it 'should create owncloud repo and install owncloud' do
             case facts[:osfamily]
             when 'Debian'
               is_expected.to contain_class('apt')
 
-              is_expected.not_to contain_class('epel')
-              is_expected.not_to contain_yumrepo('isv:ownCloud:community')
-
-              is_expected.to contain_file('/etc/apache2/sites-enabled/000-default.conf').with_ensure('absent').that_requires('Class[apache]').that_notifies('Class[apache::service]')
+              is_expected.not_to contain_yumrepo('owncloud')
 
               case facts[:operatingsystem]
               when 'Debian'
                 is_expected.to contain_apt__source('owncloud').with(
-                  location: "http://download.opensuse.org/repositories/isv:/ownCloud:/community/Debian_#{facts[:operatingsystemmajrelease]}.0/",
+                  location: "http://download.owncloud.org/download/repositories/stable/Debian_#{facts[:operatingsystemmajrelease]}.0/",
                   key: {
-                    'id' => 'F9EA4996747310AE79474F44977C43A8BA684223',
-                    'source' => "http://download.opensuse.org/repositories/isv:/ownCloud:/community/Debian_#{facts[:operatingsystemmajrelease]}.0/Release.key"
+                    'id' => 'BCECA90325B072AB1245F739AB7C32C35180350A',
+                    'source' => "https://download.owncloud.org/download/repositories/stable/Debian_#{facts[:operatingsystemmajrelease]}.0/Release.key"
                   },
                   release: ' ',
                   repos: '/'
                 ).that_comes_before("Package[#{package_name}]")
               when 'Ubuntu'
-                if facts[:lsbdistcodename] == 'precise'
-                  is_expected.to contain_apt__ppa('ppa:ondrej/php5-oldstable').that_comes_before("Package[#{package_name}]")
-                else
-                  is_expected.not_to contain_apt__ppa('ppa:ondrej/php5-oldstable').that_comes_before("Package[#{package_name}]")
-                end
-
                 is_expected.to contain_apt__source('owncloud').with(
-                  location: "http://download.opensuse.org/repositories/isv:/ownCloud:/community/xUbuntu_#{facts[:operatingsystemrelease]}/",
+                  location: "http://download.owncloud.org/download/repositories/stable/Ubuntu_#{facts[:operatingsystemrelease]}/",
                   key: {
-                    'id' => 'F9EA4996747310AE79474F44977C43A8BA684223',
-                    'source' => "http://download.opensuse.org/repositories/isv:/ownCloud:/community/xUbuntu_#{facts[:operatingsystemrelease]}/Release.key"
+                    'id' => 'BCECA90325B072AB1245F739AB7C32C35180350A',
+                    'source' => "https://download.owncloud.org/download/repositories/stable/Ubuntu_#{facts[:operatingsystemrelease]}/Release.key"
                   },
                   release: ' ',
                   repos: '/'
@@ -131,35 +127,11 @@ describe 'owncloud' do
 
               case facts[:operatingsystem]
               when 'CentOS'
-                is_expected.to contain_class('epel')
-
-                if facts[:operatingsystemmajrelease] == '6'
-                  is_expected.to contain_class('remi')
-                  is_expected.to contain_yumrepo('remi-php56')
-                else
-                  is_expected.not_to contain_class('remi')
-                  is_expected.not_to contain_yumrepo('remi-php56')
-                end
-
-                is_expected.to contain_yumrepo('isv:ownCloud:community').with(
-                  name: 'isv_ownCloud_community',
-                  # descr: "Latest stable community release of ownCloud (CentOS_CentOS-#{facts[:operatingsystemmajrelease]})",
+                is_expected.to contain_yumrepo('owncloud').with(
                   descr: "ownCloud Server Version stable (CentOS_#{facts[:operatingsystemmajrelease]})",
-                  baseurl: "https://download.owncloud.org/download/repositories/stable/CentOS_#{facts[:operatingsystemmajrelease]}/",
+                  baseurl: "http://download.owncloud.org/download/repositories/stable/CentOS_#{facts[:operatingsystemmajrelease]}/",
                   gpgcheck: 1,
-                  gpgkey: "https://download.owncloud.org/download/repositories/stable/CentOS_#{facts[:operatingsystemmajrelease]}/repodata/repomd.xml.key",
-                  enabled: 1
-                ).that_comes_before("Package[#{package_name}]")
-              when 'Fedora'
-                is_expected.not_to contain_class('epel')
-
-                is_expected.to contain_yumrepo('isv:ownCloud:community').with(
-                  name: 'isv_ownCloud_community',
-                  # descr: "Latest stable community release of ownCloud (Fedora_#{facts[:operatingsystemmajrelease]})",
-                  descr: "Latest stable community release of ownCloud (Fedora_#{facts[:operatingsystemmajrelease]})",
-                  baseurl: "http://download.opensuse.org/repositories/isv:/ownCloud:/community/Fedora_#{facts[:operatingsystemmajrelease]}/",
-                  gpgcheck: 1,
-                  gpgkey: "http://download.opensuse.org/repositories/isv:/ownCloud:/community/Fedora_#{facts[:operatingsystemmajrelease]}/repodata/repomd.xml.key",
+                  gpgkey: "http://download.owncloud.org/download/repositories/stable/CentOS_#{facts[:operatingsystemmajrelease]}/repodata/repomd.xml.key",
                   enabled: 1
                 ).that_comes_before("Package[#{package_name}]")
               end
@@ -177,23 +149,27 @@ describe 'owncloud' do
               purge_configs: false
             )
 
-            # We only test for the php module, ssl and rewrite are auto included by Apache module.
-
             is_expected.to contain_class('apache::mod::php')
+
+            if facts[:osfamily] == 'Debian'
+              %w(/etc/apache2/sites-enabled/000-default /etc/apache2/sites-enabled/000-default.conf).each do |file|
+                is_expected.to contain_file(file).with_ensure('absent').that_requires('Class[apache]').that_notifies('Class[apache::service]')
+              end
+            end
 
             # check apache vhost is generated properly
 
             vhost_params = {
-              'servername'                  => 'owncloud.example.com',
-              'port'                        => '80',
-              'docroot'                     => "#{documentroot}",
-              'docroot_owner'               => 'root',
-              'docroot_group'               => 'root',
-              'directories'                 => {
-                'path'             => "#{documentroot}",
-                'options'          => ['Indexes', 'FollowSymLinks', 'MultiViews'],
-                'allow_override'   => 'All',
-                'custom_fragment'  => 'Dav Off',
+              'servername'    => 'owncloud.example.com',
+              'port'          => '80',
+              'docroot'       => "#{documentroot}",
+              'docroot_owner' => 'root',
+              'docroot_group' => 'root',
+              'directories'   => {
+                'path'           => "#{documentroot}",
+                'options'        => ['Indexes', 'FollowSymLinks', 'MultiViews'],
+                'allow_override' => 'All',
+                'custom_fragment'=> 'Dav Off',
               }
             }
             if apache_version == '2.2'
@@ -300,9 +276,21 @@ describe 'owncloud' do
 
         context 'owncloud class with non default parameters' do
           describe 'when all manage_ parameters set to false' do
-            let(:params) { { manage_apache: false, manage_db: false, manage_repo: false, manage_skeleton: false, manage_vhost: false } }
+            let(:params) { { manage_apache: false, manage_db: false, manage_php: false, manage_repo: false, manage_skeleton: false, manage_vhost: false } }
 
             it 'should not manage any extras, just install and configure owncloud' do
+              is_expected.not_to contain_class('php')
+
+              %w(curl gd ldap mysqlnd).each do |mod|
+                is_expected.not_to contain_php__module(mod).that_requires('class[php]')
+              end
+
+              if facts[:operatingsystem] == 'CentOS'
+                %w(mbstring pecl-zip pdo process xml).each do |mod|
+                  is_expected.not_to contain_php__module(mod)
+                end
+              end
+
               is_expected.not_to contain_class('apache::mod::php')
               is_expected.not_to contain_apache__vhost('owncloud-http')
 
@@ -313,8 +301,9 @@ describe 'owncloud' do
               when 'Debian'
                 is_expected.not_to contain_apt__source('owncloud')
               when 'RedHat'
-                is_expected.not_to contain_class('epel')
-                is_expected.not_to contain_yumrepo('isv:ownCloud:community')
+                is_expected.not_to contain_class('yum::repo::epel')
+                is_expected.not_to contain_class('yum::repo::remi_php70')
+                is_expected.not_to contain_yumrepo('owncloud')
               end
 
               ['core/skeleton/documents', 'core/skeleton/music', 'core/skeleton/photos'].each do |skeleton_dir|
@@ -355,21 +344,13 @@ describe 'owncloud' do
               is_expected.to contain_file("#{documentroot}/config/autoconfig.php").with_content(/^  "dbtableprefix"(\ *)=> "test",$/)
             end
           end
-          
+
           describe 'when admin login credentials are set' do
            let(:params) { { admin_user: 'test', admin_pass: 'test'} }
 
             it 'should populate autoconfig.php.erb correctly' do
               is_expected.to contain_file("#{documentroot}/config/autoconfig.php").with_content(/^  "adminlogin"(\ *)=> "test",$/)
               is_expected.to contain_file("#{documentroot}/config/autoconfig.php").with_content(/^  "adminpass"(\ *)=> "test",$/)
-            end
-          end
-          
-          describe 'when trusted_domains are set' do
-           let(:params) { { trusted_domains: ['test']} }
-
-            it 'should populate autoconfig.php.erb correctly' do
-              is_expected.to contain_file("#{documentroot}/config/autoconfig.php").with_content(/^  "trusted_domains"(\ *)=> \["test"\],$/)
             end
           end
 
@@ -393,6 +374,16 @@ describe 'owncloud' do
             end
           end
 
+          describe 'when php_modules are defined' do
+            let(:params) { { php_modules: ['mod1','mod2']} }
+
+            it 'should install extra php modules' do
+              %w(mod1 mod2).each do |mod|
+                is_expected.to contain_php__module(mod).that_requires('class[php]')
+              end
+            end
+          end
+
           describe 'when ssl is enabled with ssl_cert and ssl_key parameters' do
             let :params do
               {
@@ -405,6 +396,14 @@ describe 'owncloud' do
             it 'should have https vhost and http redirect vhost' do
               is_expected.to contain_apache__vhost('owncloud-http').with(port: 80)
               is_expected.to contain_apache__vhost('owncloud-https').with(port: 443)
+            end
+          end
+
+          describe 'when trusted_domains are set' do
+           let(:params) { { trusted_domains: ['test']} }
+
+            it 'should populate autoconfig.php.erb correctly' do
+              is_expected.to contain_file("#{documentroot}/config/autoconfig.php").with_content(/^  "trusted_domains"(\ *)=> \["test"\],$/)
             end
           end
 
@@ -442,7 +441,7 @@ describe 'owncloud' do
 
   context 'unsupported operating system' do
     describe 'owncloud class without any parameters on Solaris/Nexenta' do
-      package_name = 'owncloud-server'
+      package_name = 'owncloud-files'
       let(:facts) do
         {
           osfamily: 'Solaris',

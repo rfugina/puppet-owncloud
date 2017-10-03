@@ -10,7 +10,7 @@ class owncloud::params {
         'Debian', 'Ubuntu': {
           $datadirectory = '/var/www/owncloud/data'
           $documentroot  = '/var/www/owncloud'
-          $package_name  = 'owncloud-server'
+          $package_name  = 'owncloud-files'
           $www_user      = 'www-data'
           $www_group     = 'www-data'
 
@@ -31,19 +31,14 @@ class owncloud::params {
     }
     'RedHat': {
       case $::operatingsystem {
-        'CentOS', 'Fedora': {
+        'CentOS': {
           $datadirectory = '/var/www/html/owncloud/data'
           $documentroot  = '/var/www/html/owncloud'
+          $package_name  = 'owncloud-files'
           $www_user      = 'apache'
           $www_group     = 'apache'
 
-          if ($::operatingsystem == 'Fedora') {
-            $package_name  = 'owncloud-server'
-          } else {
-            $package_name  = 'owncloud'
-          }
-
-          if ($::operatingsystem == 'Fedora' and versioncmp($::operatingsystemrelease, '18') >= 0) or ($::operatingsystem != 'Fedora' and versioncmp($::operatingsystemrelease, '7') >= 0) {
+          if (versioncmp($::operatingsystemrelease, '7') >= 0) {
             $apache_version = '2.4'
           } else {
             $apache_version = '2.2'

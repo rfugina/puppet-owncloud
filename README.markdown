@@ -35,6 +35,7 @@ This module provides a simple way to install ownCloud, and optionally include Ap
 * package/service/configuration files for Apache
 * Apache module and virtual hosts
 * MySQL database and user creation (does not install a MySQL server)
+* PHP server-side components and required modules
 
     * **WARNING**: If module is set to manage Apache (enabled by default), any existing Apache configuration not Puppet managed may be purged.
 
@@ -200,11 +201,11 @@ The `owncloud` class configures all possible options for this module. With defau
 
 ##### `admin_pass`
 
-Optionally set the admin password in the ownCloud configuration. 
+Optionally set the admin password in the ownCloud configuration.
 
 ##### `admin_user`
 
-Optionally set the admin user in the ownCloud configuration (using `admin_pass` as the password). If not set, OwnCloud will ask for admin credentials upon first connection.  
+Optionally set the admin user in the ownCloud configuration (using `admin_pass` as the password). If not set, OwnCloud will ask for admin credentials upon first connection.
 
 ##### `datadirectory`
 
@@ -250,9 +251,9 @@ Set to true for the module to install Apache using the [PuppetLabs Apache module
 
 Set to true for the module to create the database and database user for you, using the `db_name`, `db_user`, `db_pass` and `db_type` values. Enabling this will not install the database server, this must be done separately. Defaults to 'true'.
 
-##### `manage_phpmysql`
+##### `manage_php`
 
-Set to true for the module to install the PHP MySQL bindings using the [PuppetLabs MySQL module](https://github.com/puppetlabs/puppetlabs-mysql); this is required on some distributions until the package is installed by the ownCloud package. Defaults to 'true'.
+Set to true for the module to install and configure PHP server-side components and modules required for ownCloud. Defaults to 'true'.
 
 ##### `manage_repo`
 
@@ -265,6 +266,10 @@ Set to true for the module to manage the skeleton directory. This is could be a 
 ##### `manage_vhost`
 
 Set to true for the module to install the Apache virtual host using the [PuppetLabs Apache module](https://github.com/puppetlabs/puppetlabs-apache). It is possible to have `manage_apache` set to false and `manage_vhost` set to true to only install the vhost if you manage Apache separately. Defaults to 'true'.
+
+##### `php_modules`
+
+Specify the PHP module package names to install additional PHP modules; adding new ownCloud plug-ins may require additional PHP modules to be installed.
 
 ##### `ssl`
 
@@ -282,13 +287,23 @@ Set the path of the certificate file, must use the absolute path.
 
 Set the path of the certificate chain file, must use the absolute path.
 
+##### `ssl_cipher`
+
+Specify the Apache SSL Ciphers to use. See the [Apache Docs](http://httpd.apache.org/docs/2.4/mod/mod_ssl.html#sslciphersuite) for more details.
+Defaults to `ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA`.
+
 ##### `ssl_key`
 
 Set the path of the certificate key file, must use the absolute path.
 
+##### `ssl_protocol`
+
+Set the Apache SSL Protocols for SSL / TLS versions. See the [Apache Docs](http://httpd.apache.org/docs/2.4/mod/mod_ssl.html#sslprotocol) for more details.
+Defaults to `all -SSLv2 -SSLv3`.
+
 ##### `trusted_domains`
 
-Optional array to set the default trusted domains for OwnCloud. Use domain names without protocol. Default is unset, which will take the first domain used to connect to OwnCloud as a trusted domain name. 
+Optional array to set the default trusted domains for OwnCloud. Use domain names without protocol. Default is unset, which will take the first domain used to connect to OwnCloud as a trusted domain name.
 
 ##### `url`
 
@@ -320,17 +335,9 @@ Configures the virtual host to install if `manage_apache` or `manage_vhost` are 
     * CentOS 7
     * Debian 7
     * Debian 8
-    * Fedora 19
-    * Fedora 20
-    * Ubuntu 12.04 Precise
     * Ubuntu 14.04 Trusty
 
 ## Development
-
-In the pipeline:
-
-* Add support for additional operating systems.
-* Add support for PostgreSQL.
 
 At this time only one instance of ownCloud can be configured per host. It would be easy enough to change to a define to make a multi-tenant ownCloud server, but wasn't a requirement when writing this and can only see this being implemented if someone wants to add this functionality via a pull request.
 
